@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stage Gastro — Suivi de Progression</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-512.png">
+<meta name="theme-color" content="#4ade80">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Gastro">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --border: #2a2f3f;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #4ade80;
+    --red: #f87171;
+    --orange: #fb923c;
+    --yellow: #fbbf24;
+    --done-bg: rgba(74, 222, 128, 0.08);
+    --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    padding: 0 0 4rem;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(15,17,23,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0;
+  }
+  .tab {
+    flex: 1;
+    padding: 1rem 0.5rem;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-color 0.2s;
+    user-select: none;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  /* ── PAGES ── */
+  .page { display: none; padding: 2rem 1rem; max-width: 720px; margin: 0 auto; position: relative; z-index: 1; }
+  .page.active { display: block; }
+
+  /* ── HEADER ── */
+  header { margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1.5rem; }
+  .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+  .progress-bar-wrap { margin-top: 1.2rem; display: flex; align-items: center; gap: 1rem; }
+  .progress-track { flex: 1; height: 6px; background: var(--border); border-radius: 999px; overflow: hidden; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    border-radius: 999px;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+  }
+  .progress-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    white-space: nowrap;
+    min-width: 4rem;
+    text-align: right;
+  }
+
+  /* ── CHECKLIST ── */
+  .section { margin-bottom: 1.5rem; }
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+    padding-left: 0.25rem;
+  }
+  .item {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.6rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    user-select: none;
+  }
+  .item:hover { border-color: #3a3f52; box-shadow: 0 2px 16px rgba(0,0,0,0.3); }
+  .item.done { background: var(--done-bg); border-color: rgba(74,222,128,0.25); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot.red    { background: var(--red);    box-shadow: 0 0 8px var(--red); }
+  .dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+  .dot.yellow { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .dot.blue   { background: #60a5fa;       box-shadow: 0 0 8px #60a5fa; }
+  .item-text { flex: 1; font-size: 0.95rem; font-weight: 500; color: var(--text); transition: color 0.2s; line-height: 1.4; }
+  .item.done .item-text { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(74,222,128,0.4); }
+  .toggle-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+  }
+  .item:hover .toggle-btn { border-color: var(--accent); }
+  .item.done .toggle-btn { background: var(--accent); border-color: var(--accent); }
+  .toggle-btn::after { content: '✓'; font-weight: 700; font-size: 0.75rem; color: transparent; }
+  .item.done .toggle-btn::after { color: #0f1117; }
+
+  .reset-btn {
+    display: block; margin: 2rem auto 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem; letter-spacing: 0.1em;
+    padding: 0.5rem 1.2rem; border-radius: 6px;
+    cursor: pointer; transition: border-color 0.2s, color 0.2s;
+  }
+  .reset-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(74,222,128,0.12), rgba(34,211,238,0.08));
+    border: 1px solid rgba(74,222,128,0.3);
+    border-radius: 10px; padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem; text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem; color: var(--accent); letter-spacing: 0.05em;
+  }
+  .banner.show { display: block; }
+
+  /* ── PATIENTS PAGE ── */
+  .patients-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.2rem;
+  }
+  .add-btn {
+    background: var(--accent);
+    color: #0f1117;
+    border: none;
+    border-radius: 8px;
+    padding: 0.6rem 1.1rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+  .add-btn:hover { opacity: 0.85; }
+
+  .patient-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  /* Patient list */
+  .patient-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.6rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .patient-card:hover { border-color: var(--purple); box-shadow: 0 2px 16px rgba(0,0,0,0.3); }
+  .patient-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--purple);
+    min-width: 2rem;
+    text-align: center;
+    background: rgba(167,139,250,0.1);
+    border-radius: 6px;
+    padding: 0.2rem 0.4rem;
+  }
+  .patient-info { flex: 1; }
+  .patient-diag {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.2rem;
+  }
+  .patient-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+  .patient-delete {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.3rem;
+    border-radius: 4px;
+    transition: color 0.2s;
+    line-height: 1;
+  }
+  .patient-delete:hover { color: var(--red); }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 2;
+  }
+  .empty-state .icon { font-size: 2.5rem; display: block; margin-bottom: 1rem; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 680px;
+    margin: auto;
+    overflow: hidden;
+  }
+  .modal-header {
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .modal-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--text);
+  }
+  .modal-close {
+    background: transparent; border: none;
+    color: var(--muted); font-size: 1.3rem;
+    cursor: pointer; transition: color 0.2s;
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.2rem; }
+
+  /* Form fields */
+  .field { display: flex; flex-direction: column; gap: 0.4rem; }
+  .field-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .field-sublabel {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: -0.2rem;
+  }
+  .field input, .field textarea, .field select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.9rem;
+    padding: 0.7rem 0.9rem;
+    transition: border-color 0.2s;
+    width: 100%;
+    resize: vertical;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .field textarea { min-height: 80px; }
+
+  .field-group {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .field-group-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 0.2rem;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 0.8rem; justify-content: flex-end;
+  }
+  .btn-cancel {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .btn-cancel:hover { border-color: var(--red); color: var(--red); }
+  .btn-save {
+    background: var(--accent);
+    border: none;
+    color: #0f1117;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.6rem 1.4rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .btn-save:hover { opacity: 0.85; }
+
+  /* View modal read-only */
+  .view-field { margin-bottom: 1rem; }
+  .view-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--purple);
+    margin-bottom: 0.3rem;
+  }
+  .view-value {
+    font-size: 0.9rem;
+    color: var(--text);
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+  .view-value.empty { color: var(--muted); font-style: italic; }
+  .view-group {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+  .view-group-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.8rem;
+  }
+</style>
+</head>
+<body>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('checklist')">📋 Progression</div>
+  <div class="tab" onclick="switchTab('patients')">🩺 Patients</div>
+</div>
+
+<!-- PAGE 1: CHECKLIST -->
+<div class="page active" id="page-checklist">
+  <header>
+    <p class="label">Stage · Chirurgie Générale / Gastro</p>
+    <h1>Suivi de Progression</h1>
+    <div class="progress-bar-wrap">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <span class="progress-text" id="progressText">0 / 0</span>
+    </div>
+  </header>
+  <div class="banner" id="banner">🏆 Tout est maîtrisé — Stage validé !</div>
+  <div id="checklist"></div>
+  <button class="reset-btn" onclick="resetAll()">↺ Réinitialiser</button>
+</div>
+
+<!-- PAGE 2: PATIENTS -->
+<div class="page" id="page-patients">
+  <div class="patients-header">
+    <div>
+      <p class="label">Journal de bord</p>
+      <h1 style="font-size:1.6rem">Cas observés</h1>
+      <p class="patient-count" id="patientCount">0 cas enregistré</p>
+    </div>
+    <button class="add-btn" onclick="openAddModal()">+ Ajouter un cas</button>
+  </div>
+  <div id="patientList"></div>
+</div>
+
+<!-- MODAL: ADD PATIENT -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Nouveau cas clinique</span>
+      <button class="modal-close" onclick="closeAddModal()">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Identité -->
+      <div class="field-group">
+        <p class="field-group-title">🪪 Identité du patient</p>
+        <div class="field">
+          <label class="field-label">Diagnostic principal</label>
+          <input type="text" id="f-diag" placeholder="ex: Appendicite aiguë">
+        </div>
+        <div style="display:flex;gap:0.8rem">
+          <div class="field" style="flex:1">
+            <label class="field-label">Âge</label>
+            <input type="text" id="f-age" placeholder="ex: 34 ans">
+          </div>
+          <div class="field" style="flex:1">
+            <label class="field-label">Sexe</label>
+            <select id="f-sexe">
+              <option value="">—</option>
+              <option value="H">Homme</option>
+              <option value="F">Femme</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Motif + ATCD -->
+      <div class="field-group">
+        <p class="field-group-title">📋 Motif + Antécédents</p>
+        <div class="field">
+          <label class="field-label">Motif de consultation</label>
+          <textarea id="f-motif" placeholder="Douleur abdominale, fièvre..."></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Antécédents</label>
+          <textarea id="f-atcd" placeholder="Chirurgicaux, médicaux, familiaux..."></textarea>
+        </div>
+      </div>
+
+      <!-- Examen clinique -->
+      <div class="field-group">
+        <p class="field-group-title">🔍 Examen clinique</p>
+        <div class="field">
+          <label class="field-label">Inspection</label>
+          <textarea id="f-inspection" placeholder="Aspect général, abdomen..."></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Palpation</label>
+          <textarea id="f-palpation" placeholder="Défense, contracture, masse, point douloureux..."></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Percussion</label>
+          <textarea id="f-percussion" placeholder="Matité, tympanisme, disparition de la matité hépatique..."></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Auscultation</label>
+          <textarea id="f-auscultation" placeholder="Bruits intestinaux, silence..."></textarea>
+        </div>
+      </div>
+
+      <!-- Examens complémentaires -->
+      <div class="field-group">
+        <p class="field-group-title">🧪 Examens complémentaires</p>
+        <div class="field">
+          <label class="field-label">Biologie</label>
+          <textarea id="f-bio" placeholder="FNS, CRP, ionogramme, résultats..."></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Imagerie</label>
+          <textarea id="f-imagerie" placeholder="Échographie, scanner — résultats..."></textarea>
+        </div>
+      </div>
+
+      <!-- Diagnostic + Traitement -->
+      <div class="field-group">
+        <p class="field-group-title">💊 Diagnostic + Traitement</p>
+        <div class="field">
+          <label class="field-label">Diagnostic retenu</label>
+          <textarea id="f-diagfinal" placeholder="Diagnostic définitif..."></textarea>
+        </div>
+        <div class="field">
+          <label class="field-label">Décision thérapeutique</label>
+          <textarea id="f-traitement" placeholder="Chirurgie, médical, surveillance... type d'intervention..."></textarea>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="field-group">
+        <p class="field-group-title">📝 Notes personnelles</p>
+        <div class="field">
+          <label class="field-label">Ce que j'ai appris / retenu</label>
+          <textarea id="f-notes" placeholder="Leçon clinique, point intéressant, question posée..."></textarea>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeAddModal()">Annuler</button>
+      <button class="btn-save" onclick="savePatient()">Enregistrer le cas</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: VIEW PATIENT -->
+<div class="modal-overlay" id="viewModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="viewModalTitle">Cas clinique</span>
+      <button class="modal-close" onclick="closeViewModal()">✕</button>
+    </div>
+    <div class="modal-body" id="viewModalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeViewModal()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── TABS ──
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='checklist')||(i===1&&tab==='patients')));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+}
+
+// ── CHECKLIST DATA ──
+const data = [
+  {
+    section: "1. CE QUE TU DOIS SAVOIR AVANT DE COMMENCER",
+    items: [
+      { id: "clinique",    dot: "blue",   text: "A. Examen clinique abdominal (OBLIGATOIRE)" },
+      { id: "peritoneal",  dot: "red",    text: "🔴 Syndrome péritonéal" },
+      { id: "occlusif",    dot: "orange", text: "🟠 Syndrome occlusif" },
+      { id: "infectieux",  dot: "yellow", text: "🟡 Syndrome infectieux abdominal" },
+    ]
+  },
+  {
+    section: "2. MALADIES À CONNAÎTRE — 🔴 URGENCES",
+    items: [
+      { id: "appendicite",  dot: "red", text: "Appendicite aiguë" },
+      { id: "occlusion",    dot: "red", text: "Occlusion intestinale" },
+      { id: "peritonite",   dot: "red", text: "Péritonite" },
+      { id: "cholecystite", dot: "red", text: "Cholécystite aiguë" },
+      { id: "hernie",       dot: "red", text: "Hernie étranglée" },
+    ]
+  },
+  {
+    section: "2. MALADIES À CONNAÎTRE — 🟠 PATHOLOGIES FRÉQUENTES",
+    items: [
+      { id: "gastroenterite", dot: "orange", text: "Gastro-entérite aiguë" },
+      { id: "colique",        dot: "orange", text: "Colique hépatique" },
+      { id: "ulcere",         dot: "orange", text: "Ulcère gastro-duodénal" },
+      { id: "hemorragie",     dot: "orange", text: "Hémorragie digestive (méléna / hématémèse)" },
+    ]
+  },
+  {
+    section: "3. EXAMENS COMPLÉMENTAIRES À COMPRENDRE",
+    items: [
+      { id: "biologie", dot: "blue", text: "Biologie — FNS · CRP · Ionogramme" },
+      { id: "echo",     dot: "blue", text: "Échographie abdominale" },
+      { id: "scanner",  dot: "blue", text: "Scanner abdominal" },
+    ]
+  }
+];
+
+function loadState() { try { return JSON.parse(localStorage.getItem('gastro_progress') || '{}'); } catch { return {}; } }
+function saveState(s) { try { localStorage.setItem('gastro_progress', JSON.stringify(s)); } catch {} }
+let state = loadState();
+
+function render() {
+  const list = document.getElementById('checklist');
+  list.innerHTML = '';
+  let total = 0, done = 0;
+  data.forEach(section => {
+    const sec = document.createElement('div');
+    sec.className = 'section';
+    const title = document.createElement('p');
+    title.className = 'section-title';
+    title.textContent = section.section;
+    sec.appendChild(title);
+    section.items.forEach(item => {
+      total++;
+      const isDone = !!state[item.id];
+      if (isDone) done++;
+      const card = document.createElement('div');
+      card.className = 'item' + (isDone ? ' done' : '');
+      card.onclick = () => toggle(item.id);
+      const dot = document.createElement('div');
+      dot.className = `dot ${item.dot}`;
+      const text = document.createElement('span');
+      text.className = 'item-text';
+      text.textContent = item.text;
+      const btn = document.createElement('div');
+      btn.className = 'toggle-btn';
+      card.appendChild(dot); card.appendChild(text); card.appendChild(btn);
+      sec.appendChild(card);
+    });
+    list.appendChild(sec);
+  });
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} / ${total}`;
+  const banner = document.getElementById('banner');
+  if (done === total && total > 0) banner.classList.add('show');
+  else banner.classList.remove('show');
+}
+
+function toggle(id) { state[id] = !state[id]; saveState(state); render(); }
+function resetAll() {
+  if (confirm('Réinitialiser toute la progression ?')) { state = {}; saveState(state); render(); }
+}
+
+// ── PATIENTS ──
+function loadPatients() { try { return JSON.parse(localStorage.getItem('gastro_patients') || '[]'); } catch { return []; } }
+function savePatients(p) { try { localStorage.setItem('gastro_patients', JSON.stringify(p)); } catch {} }
+let patients = loadPatients();
+
+function renderPatients() {
+  const list = document.getElementById('patientList');
+  const count = document.getElementById('patientCount');
+  count.textContent = patients.length === 0 ? '0 cas enregistré' : `${patients.length} cas enregistré${patients.length>1?'s':''}`;
+  if (patients.length === 0) {
+    list.innerHTML = `<div class="empty-state"><span class="icon">🩺</span>Aucun cas enregistré pour l'instant.<br>Clique sur "+ Ajouter un cas" pour commencer<br>ton journal de bord clinique.</div>`;
+    return;
+  }
+  list.innerHTML = '';
+  patients.forEach((p, i) => {
+    const card = document.createElement('div');
+    card.className = 'patient-card';
+    card.innerHTML = `
+      <span class="patient-num">#${String(i+1).padStart(2,'0')}</span>
+      <div class="patient-info">
+        <div class="patient-diag">${p.diag || 'Diagnostic non renseigné'}</div>
+        <div class="patient-meta">${p.age ? p.age + ' · ' : ''}${p.sexe ? (p.sexe==='H'?'Homme':'Femme') + ' · ' : ''}${p.date}</div>
+      </div>
+      <button class="patient-delete" onclick="event.stopPropagation(); deletePatient(${i})" title="Supprimer">🗑</button>
+    `;
+    card.onclick = () => viewPatient(i);
+    list.appendChild(card);
+  });
+}
+
+function openAddModal() {
+  ['diag','age','motif','atcd','inspection','palpation','percussion','auscultation','bio','imagerie','diagfinal','traitement','notes'].forEach(id => {
+    const el = document.getElementById('f-'+id);
+    if (el) el.value = '';
+  });
+  document.getElementById('f-sexe').value = '';
+  document.getElementById('addModal').classList.add('open');
+}
+function closeAddModal() { document.getElementById('addModal').classList.remove('open'); }
+
+function savePatient() {
+  const diag = document.getElementById('f-diag').value.trim();
+  if (!diag) { alert('Le diagnostic est obligatoire.'); return; }
+  const now = new Date();
+  const date = now.toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' });
+  const patient = {
+    diag, date,
+    age: document.getElementById('f-age').value.trim(),
+    sexe: document.getElementById('f-sexe').value,
+    motif: document.getElementById('f-motif').value.trim(),
+    atcd: document.getElementById('f-atcd').value.trim(),
+    inspection: document.getElementById('f-inspection').value.trim(),
+    palpation: document.getElementById('f-palpation').value.trim(),
+    percussion: document.getElementById('f-percussion').value.trim(),
+    auscultation: document.getElementById('f-auscultation').value.trim(),
+    bio: document.getElementById('f-bio').value.trim(),
+    imagerie: document.getElementById('f-imagerie').value.trim(),
+    diagfinal: document.getElementById('f-diagfinal').value.trim(),
+    traitement: document.getElementById('f-traitement').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+  };
+  patients.unshift(patient);
+  savePatients(patients);
+  renderPatients();
+  closeAddModal();
+}
+
+function deletePatient(i) {
+  if (confirm('Supprimer ce cas ?')) {
+    patients.splice(i, 1);
+    savePatients(patients);
+    renderPatients();
+  }
+}
+
+function viewPatient(i) {
+  const p = patients[i];
+  document.getElementById('viewModalTitle').textContent = p.diag || 'Cas clinique';
+  const body = document.getElementById('viewModalBody');
+
+  function vf(label, val) {
+    return `<div class="view-field">
+      <div class="view-label">${label}</div>
+      <div class="view-value${!val?' empty':''}">${val || 'Non renseigné'}</div>
+    </div>`;
+  }
+  function vg(title, fields) {
+    return `<div class="view-group"><div class="view-group-title">${title}</div>${fields}</div>`;
+  }
+
+  body.innerHTML =
+    vg('🪪 Identité', vf('Diagnostic', p.diag) + vf('Âge', p.age) + vf('Sexe', p.sexe==='H'?'Homme':p.sexe==='F'?'Femme':'') + vf('Date', p.date)) +
+    vg('📋 Motif + Antécédents', vf('Motif de consultation', p.motif) + vf('Antécédents', p.atcd)) +
+    vg('🔍 Examen clinique', vf('Inspection', p.inspection) + vf('Palpation', p.palpation) + vf('Percussion', p.percussion) + vf('Auscultation', p.auscultation)) +
+    vg('🧪 Examens complémentaires', vf('Biologie', p.bio) + vf('Imagerie', p.imagerie)) +
+    vg('💊 Diagnostic + Traitement', vf('Diagnostic retenu', p.diagfinal) + vf('Décision thérapeutique', p.traitement)) +
+    vg('📝 Notes personnelles', vf('Ce que j\'ai appris', p.notes));
+
+  document.getElementById('viewModal').classList.add('open');
+}
+function closeViewModal() { document.getElementById('viewModal').classList.remove('open'); }
+
+// ── INIT ──
+render();
+renderPatients();
+</script>
+</body>
+</html>
