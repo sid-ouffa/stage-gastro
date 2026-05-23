@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stage Gastro — Suivi de Progression</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --border: #2a2f3f;
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #4ade80;
+    --accent-glow: rgba(74, 222, 128, 0.15);
+    --red: #f87171;
+    --orange: #fb923c;
+    --yellow: #fbbf24;
+    --done-bg: rgba(74, 222, 128, 0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 720px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  header {
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+
+  .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.5rem;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.8rem, 5vw, 2.6rem);
+    font-weight: 700;
+    color: var(--text);
+    line-height: 1.1;
+  }
+
+  .progress-bar-wrap {
+    margin-top: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 6px;
+    background: var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    border-radius: 999px;
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+  }
+
+  .progress-text {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--accent);
+    white-space: nowrap;
+    min-width: 4rem;
+    text-align: right;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 1.5rem;
+  }
+
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+    padding-left: 0.25rem;
+  }
+
+  /* Item card */
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 0.6rem;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+    user-select: none;
+  }
+
+  .item:hover {
+    border-color: #3a3f52;
+    box-shadow: 0 2px 16px rgba(0,0,0,0.3);
+  }
+
+  .item.done {
+    background: var(--done-bg);
+    border-color: rgba(74, 222, 128, 0.25);
+  }
+
+  /* Color dot */
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.red    { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+  .dot.yellow { background: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+  .dot.blue   { background: #60a5fa; box-shadow: 0 0 8px #60a5fa; }
+
+  /* Item text */
+  .item-text {
+    flex: 1;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+    transition: color 0.2s;
+    line-height: 1.4;
+  }
+
+  .item.done .item-text {
+    color: var(--muted);
+    text-decoration: line-through;
+    text-decoration-color: rgba(74,222,128,0.4);
+  }
+
+  /* Toggle button */
+  .toggle-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.2s, background 0.2s;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: transparent;
+  }
+
+  .item:hover .toggle-btn {
+    border-color: var(--accent);
+  }
+
+  .item.done .toggle-btn {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #0f1117;
+  }
+
+  .toggle-btn::after {
+    content: '✓';
+    font-weight: 700;
+    font-size: 0.75rem;
+  }
+
+  .item.done .toggle-btn::after {
+    color: #0f1117;
+  }
+
+  /* Reset button */
+  .reset-btn {
+    display: block;
+    margin: 2rem auto 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    padding: 0.5rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  /* Completion banner */
+  .banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(74,222,128,0.12), rgba(34,211,238,0.08));
+    border: 1px solid rgba(74,222,128,0.3);
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  .banner.show { display: block; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <p class="label">Stage · Gastroentérologie</p>
+    <h1>Suivi de Progression</h1>
+    <div class="progress-bar-wrap">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <span class="progress-text" id="progressText">0 / 0</span>
+    </div>
+  </header>
+
+  <div class="banner" id="banner">🏆 Tout est maîtrisé — Stage gastro validé !</div>
+
+  <div id="checklist"></div>
+
+  <button class="reset-btn" onclick="resetAll()">↺ Réinitialiser</button>
+
+</div>
+
+<script>
+const data = [
+  {
+    section: "1. CE QUE TU DOIS SAVOIR AVANT DE COMMENCER",
+    items: [
+      { id: "clinique",    dot: "blue",   text: "A. Examen clinique abdominal (OBLIGATOIRE)" },
+      { id: "peritoneal",  dot: "red",    text: "🔴 Syndrome péritonéal" },
+      { id: "occlusif",    dot: "orange", text: "🟠 Syndrome occlusif" },
+      { id: "infectieux",  dot: "yellow", text: "🟡 Syndrome infectieux abdominal" },
+    ]
+  },
+  {
+    section: "2. MALADIES À CONNAÎTRE — 🔴 URGENCES (très important)",
+    items: [
+      { id: "appendicite",  dot: "red", text: "Appendicite aiguë" },
+      { id: "occlusion",    dot: "red", text: "Occlusion intestinale" },
+      { id: "peritonite",   dot: "red", text: "Péritonite" },
+      { id: "cholecystite", dot: "red", text: "Cholécystite aiguë" },
+      { id: "hernie",       dot: "red", text: "Hernie étranglée" },
+    ]
+  },
+  {
+    section: "2. MALADIES À CONNAÎTRE — 🟠 PATHOLOGIES FRÉQUENTES",
+    items: [
+      { id: "gastroenterite", dot: "orange", text: "Gastro-entérite aiguë" },
+      { id: "colique",        dot: "orange", text: "Colique hépatique" },
+      { id: "ulcere",         dot: "orange", text: "Ulcère gastro-duodénal" },
+      { id: "hemorragie",     dot: "orange", text: "Hémorragie digestive (méléna / hématémèse)" },
+    ]
+  },
+  {
+    section: "3. EXAMENS COMPLÉMENTAIRES À COMPRENDRE",
+    items: [
+      { id: "biologie",    dot: "blue", text: "Biologie — FNS · CRP · Ionogramme" },
+      { id: "echo",        dot: "blue", text: "Échographie abdominale" },
+      { id: "scanner",     dot: "blue", text: "Scanner abdominal" },
+    ]
+  }
+];
+
+function loadState() {
+  try { return JSON.parse(localStorage.getItem('gastro_progress') || '{}'); } catch { return {}; }
+}
+
+function saveState(state) {
+  try { localStorage.setItem('gastro_progress', JSON.stringify(state)); } catch {}
+}
+
+let state = loadState();
+
+function render() {
+  const list = document.getElementById('checklist');
+  list.innerHTML = '';
+
+  let total = 0, done = 0;
+
+  data.forEach(section => {
+    const sec = document.createElement('div');
+    sec.className = 'section';
+
+    const title = document.createElement('p');
+    title.className = 'section-title';
+    title.textContent = section.section;
+    sec.appendChild(title);
+
+    section.items.forEach(item => {
+      total++;
+      const isDone = !!state[item.id];
+      if (isDone) done++;
+
+      const card = document.createElement('div');
+      card.className = 'item' + (isDone ? ' done' : '');
+      card.onclick = () => toggle(item.id);
+
+      const dot = document.createElement('div');
+      dot.className = `dot ${item.dot}`;
+
+      const text = document.createElement('span');
+      text.className = 'item-text';
+      text.textContent = item.text;
+
+      const btn = document.createElement('div');
+      btn.className = 'toggle-btn';
+
+      card.appendChild(dot);
+      card.appendChild(text);
+      card.appendChild(btn);
+      sec.appendChild(card);
+    });
+
+    list.appendChild(sec);
+  });
+
+  // Update progress
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressText').textContent = `${done} / ${total}`;
+
+  // Banner
+  const banner = document.getElementById('banner');
+  if (done === total && total > 0) banner.classList.add('show');
+  else banner.classList.remove('show');
+}
+
+function toggle(id) {
+  state[id] = !state[id];
+  saveState(state);
+  render();
+}
+
+function resetAll() {
+  if (confirm('Réinitialiser toute la progression ?')) {
+    state = {};
+    saveState(state);
+    render();
+  }
+}
+
+render();
+</script>
+</body>
+</html>
